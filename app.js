@@ -90,7 +90,11 @@ function loadConfig() {
   const hosted = location.hostname.endsWith('.github.io')
     ? { owner: location.hostname.slice(0, -'.github.io'.length), repo: location.pathname.split('/')[1] || '' }
     : {};
-  return { ...DEFAULT_CONFIG, ...hosted, ...stored };
+  return {
+    owner: stored.owner || hosted.owner || '',
+    repo: stored.repo || hosted.repo || '',
+    branch: stored.branch || DEFAULT_CONFIG.branch,
+  };
 }
 function saveConfig(c) { localStorage.setItem(LS.config, JSON.stringify(c)); }
 async function loadPat() {
