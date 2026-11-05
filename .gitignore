@@ -1,0 +1,14 @@
+# Plaintext intermediates must never reach the repository
+*.plain.json
+*.plain.txt
+*.env
+.env
+*.log
+
+# Local tooling
+node_modules/
+.selftest-tmp/
+edge-profile/
+edge-cdp/
+Thumbs.db
+.DS_Store

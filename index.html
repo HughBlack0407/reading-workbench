@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com; img-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>读书笔记工作台</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<div id="boot" class="boot">正在加载…</div>
+
+<section id="setup" class="gate hidden">
+  <div class="gate-card">
+    <h1>尚未初始化</h1>
+    <p class="muted">此页面需要先生成加密库，并把数据与页面推送到 GitHub 仓库。</p>
+    <ol class="steps">
+      <li>在电脑上运行 <code>node scripts/init_vault.mjs</code>，设定至少 12 字符的口令。</li>
+      <li>运行 <code>node scripts/sync_weread.mjs --push</code>，同步微信读书数据。</li>
+      <li>提交 <code>vault.meta.json</code> 与数据文件，在仓库设置中开启 GitHub Pages。</li>
+    </ol>
+    <p class="gate-note">口令由使用者自行设定，不写入任何文件。完整步骤见仓库 README.md。请通过 http(s) 地址打开本页面，不要直接双击本地文件。</p>
+  </div>
+</section>
+
+<section id="gate" class="gate hidden">
+  <div class="gate-card">
+    <h1>读书笔记工作台</h1>
+    <p class="muted">内容以密文保存在公开仓库，口令仅用于在本机解密，不会上传。</p>
+
+    <div id="gate-config" class="form-grid hidden">
+      <label>仓库所有者<input id="cfg-owner" type="text" autocomplete="off" spellcheck="false" placeholder="GitHub 用户名"></label>
+      <label>仓库名<input id="cfg-repo" type="text" autocomplete="off" spellcheck="false" placeholder="仓库名"></label>
+      <label>分支<input id="cfg-branch" type="text" autocomplete="off" spellcheck="false" value="main"></label>
+    </div>
+
+    <label class="pass-label">口令
+      <input id="gate-pass" type="password" autocomplete="current-password" spellcheck="false" placeholder="至少 12 字符">
+    </label>
+    <div class="row">
+      <button id="gate-unlock" class="primary" type="button">解锁</button>
+      <button id="gate-toggle-config" class="ghost" type="button">仓库设置</button>
+    </div>
+    <p id="gate-msg" class="msg" role="status"></p>
+
+    <details class="gate-note">
+      <summary>安全边界</summary>
+      <p>本工作台保护的是内容机密性，不是访问权限。页面与仓库公开，任何人都能下载密文、看到文件名与提交时间；没有口令则读不到内容，也解不开写回令牌。</p>
+      <p>解锁是本地行为，没有服务端账号或会话。忘记口令无法恢复，请自行保管并定期导出备份。</p>
+      <p>未配置写回令牌时自动进入只读模式，适合手机查看。</p>
+    </details>
+  </div>
+</section>
+
+<div id="app" class="app hidden">
+  <header class="topbar">
+    <div class="brand">读书笔记工作台</div>
+    <div class="topmeta">
+      <span id="mode-badge" class="badge">只读</span>
+      <span id="sync-time" class="muted small"></span>
+      <span id="save-state" class="muted small"></span>
+      <button id="btn-lock" class="ghost small" type="button">锁定</button>
+    </div>
+  </header>
+
+  <div id="conflict" class="banner hidden" role="alert">
+    <span>云端内容已在别处更新。为避免覆盖，本次保存未生效，请重新加载后再编辑。</span>
+    <button id="btn-reload" class="ghost small" type="button">重新加载</button>
+  </div>
+
+  <div class="layout">
+    <nav id="nav" class="nav" aria-label="分区">
+      <button data-view="shelf" class="nav-item" type="button">最近在读</button>
+      <button data-view="highlights" class="nav-item" type="button">划线想法</button>
+      <button data-view="notes" class="nav-item" type="button">我的笔记</button>
+      <button data-view="stats" class="nav-item" type="button">阅读统计</button>
+      <button data-view="settings" class="nav-item" type="button">设置</button>
+    </nav>
+    <main id="main" class="main"></main>
+  </div>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
