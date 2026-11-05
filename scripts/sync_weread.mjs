@@ -81,8 +81,7 @@ async function safeCall(apiName, extra, label) {
   try { return await weread(apiName, extra); }
   catch (e) {
     if (e instanceof UpgradeRequired) throw e;
-    console.warn(`  跳过 ${label}: ${e.message}`);
-    return null;
+    throw new Error(`${label} 获取失败，本次同步未发布：${e.message}`);
   }
 }
 
@@ -146,9 +145,13 @@ async function collectNotebooks() {
     const p = await weread('/user/notebooks', extra);
     const batch = Array.isArray(p.books) ? p.books : [];
     list.push(...batch);
-    if (Number(p.hasMore) !== 1 || batch.length === 0) break;
+    if (Number(p.hasMore) !== 1) break;
+    if (batch.length === 0) throw new Error('笔记本分页返回空页但仍提示更多，本次同步未发布');
+    if (page === 49) throw new Error('笔记本超过 50 页，本次同步未发布');
     const last = batch[batch.length - 1];
-    if (last?.sort == null) break;
+    if (last?.sort == null || last.sort === lastSort) {
+      throw new Error('笔记本分页游标无效，本次同步未发布');
+    }
     lastSort = last.sort;
   }
   return list;
@@ -200,12 +203,13 @@ async function collectHighlights(notebooks) {
     }
 
     // NOTE: this endpoint uses lowercase `bookid`.
-    const rv = await safeCall(
-      '/review/list/mine',
-      { bookid: bookId, count: 100, synckey: 0 },
-      `想法 ${bookId}`,
-    );
-    if (rv) {
+    let synckey = 0;
+    for (let page = 0; page < 100; page += 1) {
+      const rv = await safeCall(
+        '/review/list/mine',
+        { bookid: bookId, count: 100, synckey },
+        `想法 ${bookId}`,
+      );
       for (const r of (Array.isArray(rv.reviews) ? rv.reviews : [])) {
         const x = r.review || {};
         items.push({
@@ -220,6 +224,11 @@ async function collectHighlights(notebooks) {
           range: x.range || null,
         });
       }
+      if (Number(rv.hasMore) !== 1) break;
+      if (page === 99 || rv.synckey == null || Number(rv.synckey) === Number(synckey)) {
+        throw new Error(`想法 ${bookId} 分页游标无效或超过上限，本次同步未发布`);
+      }
+      synckey = rv.synckey;
     }
   }
   items.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));

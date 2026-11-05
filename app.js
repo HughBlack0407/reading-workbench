@@ -30,6 +30,8 @@ const state = {
   conflict: false,
   search: '',
   status: '',
+  draftRevision: 0,
+  saving: false,
 };
 
 /* ---------- small helpers ---------- */
@@ -179,6 +181,13 @@ function bindStaticEvents() {
   $('btn-lock').addEventListener('click', lock);
   $('btn-reload').addEventListener('click', async () => {
     try {
+      commitEditor();
+      if (state.dirty) {
+        download(`reading-local-draft-${formatDate(new Date())}.json`,
+          JSON.stringify({ exportedAt: new Date().toISOString(), notes: state.data.notes }, null, 2));
+      }
+      state.draftRevision += 1;
+      localStorage.removeItem(LS.draft);
       await loadData();
       state.conflict = false;
       state.dirty = false;
@@ -255,7 +264,7 @@ async function unlock() {
     setGateMsg('');
     $('gate').classList.add('hidden');
     $('app').classList.remove('hidden');
-    setStatus(state.readOnly ? '只读模式' : '可编辑');
+    if (!state.dirty && !state.conflict) setStatus(state.readOnly ? '只读模式' : '可编辑');
     render();
   } catch (e) {
     setGateMsg(e.message.includes('mismatch') ? '口令无法解密，请重试' : e.message);
@@ -278,6 +287,8 @@ function lock() {
 async function loadData() {
   const keys = Object.keys(FILES);
   state.fallback = false;
+  state.conflict = false;
+  state.dirty = false;
   for (let i = 0; i < keys.length; i += 1) {
     setStatus(`正在读取仓库数据… ${i + 1}/${keys.length}`);
     const f = await readDataFile(FILES[keys[i]]);
@@ -291,6 +302,7 @@ async function loadData() {
   }
   if (!state.data.notes) state.data.notes = { schema: 1, type: 'notes', updatedAt: null, notes: [] };
   if (!Array.isArray(state.data.notes.notes)) state.data.notes.notes = [];
+  await restoreDraft();
 }
 
 /* ---------- Markdown (safe DOM construction, no innerHTML) ---------- */
@@ -485,27 +497,33 @@ function commitEditor() {
   n.body = b.value;
 }
 async function saveDraft() {
-  const t = $('note-title'); const b = $('note-body');
-  if (!state.key || !t || !b || !state.selectedNoteId) return;
+  if (!state.key || !state.data.notes) return;
+  commitEditor();
+  const revision = ++state.draftRevision;
+  const key = state.key;
+  const draft = {
+    notes: structuredClone(state.data.notes), baseSha: state.sha.notes, at: Date.now(),
+  };
   try {
-    const env = await encryptJSON(
-      { id: state.selectedNoteId, title: t.value, body: b.value, at: Date.now() },
-      state.key, state.salt,
-    );
-    localStorage.setItem(LS.draft, JSON.stringify(env));
+    const env = await encryptJSON(draft, key, state.salt);
+    if (revision === state.draftRevision && state.key === key) {
+      localStorage.setItem(LS.draft, JSON.stringify(env));
+    }
   } catch { /* storage unavailable: keep the in-memory editor only */ }
 }
-async function restoreDraft(note, titleEl, bodyEl) {
+async function restoreDraft() {
   const raw = localStorage.getItem(LS.draft);
   if (!raw) return;
   try {
     const d = await decryptJSON(JSON.parse(raw), state.key);
-    if (d.id !== note.id) return;
-    if (Number(d.at) <= (Date.parse(note.updatedAt || 0) || 0)) return;
-    titleEl.value = d.title;
-    bodyEl.value = d.body;
+    if (!d.notes || !Array.isArray(d.notes.notes)) return;
+    if (Number(d.at) <= (Date.parse(state.data.notes.updatedAt || 0) || 0)) return;
+    state.data.notes = d.notes;
     state.dirty = true;
-    setStatus('已恢复未保存的草稿');
+    if (d.baseSha !== state.sha.notes) {
+      state.conflict = true;
+      setStatus('云端笔记已变化，本机草稿已保留，不能直接保存');
+    } else setStatus('已恢复未保存的草稿');
   } catch { /* ignore stale or unreadable drafts */ }
 }
 
@@ -552,7 +570,6 @@ function renderNoteDetail(box, note) {
   for (const node of [title, ta]) {
     node.addEventListener('input', () => { state.dirty = true; setStatus('有未保存的修改'); saveDraft(); });
   }
-  restoreDraft(note, title, ta);
 }
 
 function createNote() {
@@ -566,6 +583,7 @@ function createNote() {
   state.editMode = 'edit';
   state.dirty = true;
   render();
+  saveDraft();
 }
 async function deleteNote() {
   if (!window.confirm('确定删除这篇笔记？删除后会立即写入仓库。')) return;
@@ -574,18 +592,32 @@ async function deleteNote() {
   state.selectedNoteId = null;
   state.editMode = 'view';
   state.dirty = true;
+  await saveDraft();
   await saveNotes();
 }
 async function saveNotes() {
   if (state.readOnly) { setStatus('当前为只读模式'); return; }
+  if (state.conflict) { setStatus('请先下载本机草稿并重新加载云端笔记'); return; }
+  if (state.saving) return;
   commitEditor();
   const n = currentNote();
   if (n) n.updatedAt = new Date().toISOString();
   state.data.notes.updatedAt = new Date().toISOString();
-  const env = await encryptJSON(state.data.notes, state.key, state.salt);
-  const text = `${JSON.stringify(env)}\n`;
+  await saveDraft();
+  state.saving = true;
+  const savedRevision = state.draftRevision;
+  let text;
+  try {
+    const env = await encryptJSON(state.data.notes, state.key, state.salt);
+    text = `${JSON.stringify(env)}\n`;
+  } catch (e) {
+    state.saving = false;
+    setStatus(`加密失败：${e.message}`);
+    return;
+  }
   if (new Blob([text]).size > 900000) {
     setStatus('笔记数据超过 800KB，请先导出备份并拆分');
+    state.saving = false;
     return;
   }
   setStatus('保存中…');
@@ -593,16 +625,29 @@ async function saveNotes() {
     const res = await writeDataFile(FILES.notes, text, state.sha.notes);
     if (res.conflict) {
       state.conflict = true;
+      await saveDraft();
       setStatus('保存未生效：云端内容已在别处更新');
+      state.saving = false;
       render();
       return;
     }
     state.sha.notes = res.sha;
-    state.dirty = false;
     state.conflict = false;
-    localStorage.removeItem(LS.draft);
-    setStatus(`已保存 · ${new Date().toLocaleTimeString('zh-CN')}`);
-  } catch (e) { setStatus(`保存失败：${e.message}`); }
+    if (savedRevision === state.draftRevision) {
+      state.dirty = false;
+      state.draftRevision += 1;
+      localStorage.removeItem(LS.draft);
+      setStatus(`已保存 · ${new Date().toLocaleTimeString('zh-CN')}`);
+    } else {
+      state.dirty = true;
+      await saveDraft();
+      setStatus('先前修改已保存，仍有未保存内容');
+    }
+  } catch (e) {
+    await saveDraft();
+    setStatus(`保存失败：${e.message}`);
+  }
+  state.saving = false;
   render();
 }
 
