@@ -56,7 +56,7 @@ node scripts/sync_weread.mjs --push  # 输入同一口令，拉取数据、加�
 
 打开 `https://<owner>.github.io/<repo>/`：
 
-- 首次填写仓库所有者、仓库名、分支，输入口令解锁。此时是**只读模式**，手机端保持这样即可。
+- 打开本仓库 Pages 时只需输入口令解锁。若改用其他地址部署，可在页面上手动填写仓库所有者、仓库名和分支。解锁后默认是**只读模式**，手机端保持这样即可。
 - 电脑端如要编辑：设置 → 写回令牌 → 填入 fine-grained PAT → 保存并切换为可编辑。令牌会用口令加密后只存在这台设备的浏览器里。
 
 Pages 在 push 后最多需要 10 分钟生效（GitHub 官方文档）。页面读数据走 `api.github.com`，不受这个延迟影响；只有改了页面文件本身才需要等部署。
@@ -112,7 +112,7 @@ node scripts/selftest_data.mjs --dir .  # 校验已生成的密文与统计口�
 |---|---|
 | `vault.meta.json` | 明文。版本、KDF 参数、salt、口令校验块。不含口令或密钥，需提交 |
 | `data/sync/*.enc` | 密文。书架、划线想法、统计、同步元信息。仅由 `sync_weread.mjs` 写入 |
-| `data/sync/manifest.json` | 明文索引。固定文件名、同步时间、条数，不含书名 |
+| `data/sync/manifest.json` | 明文索引。固定文件名和同步时间，不含书名及统计数量 |
 | `data/notes/notes.enc` | 密文。全部用户笔记聚合成单文件，仅由页面写入 |
 | `scripts/crypto.mjs` | Node 侧加密实现 |
 | `crypto-web.js` | 浏览器侧 Web Crypto 实现，与 Node 侧字节级兼容 |

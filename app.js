@@ -790,11 +790,34 @@ function renderSettings(root) {
   savePat.addEventListener('click', async () => {
     const v = i4.value.trim();
     if (!v) { setStatus('请输入令牌'); return; }
-    await storePat(v);
+    if (state.dirty) { setStatus('请先保存或备份未保存的笔记'); return; }
+    const previousPat = state.pat;
+    const previousReadOnly = state.readOnly;
+    const previousData = state.data;
+    const previousSha = state.sha;
+    const previousFallback = state.fallback;
+    const previousConflict = state.conflict;
+    state.pat = v;
     state.readOnly = false;
-    i4.value = '';
-    try { await loadData(); setStatus('已切换为可编辑'); render(); }
-    catch (e) { setStatus(`读取失败：${e.message}`); render(); }
+    state.data = { ...state.data };
+    state.sha = { ...state.sha };
+    try {
+      await loadData();
+      if (!state.sha.notes) throw new Error('未获取到笔记文件的云端版本，请稍后重试');
+      await storePat(v);
+      i4.value = '';
+      setStatus('已切换为可编辑');
+      render();
+    } catch (e) {
+      state.pat = previousPat;
+      state.readOnly = previousReadOnly;
+      state.data = previousData;
+      state.sha = previousSha;
+      state.fallback = previousFallback;
+      state.conflict = previousConflict;
+      setStatus(`写回令牌不可用：${e.message}`);
+      render();
+    }
   });
   row2.appendChild(savePat);
   const clearPat = el('button', 'ghost', '清除，改为只读');
