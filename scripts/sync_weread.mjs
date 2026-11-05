@@ -368,9 +368,16 @@ async function main() {
   const changed = git(['status', '--porcelain', '--', SYNC_DIR]);
   if (!changed) { console.log('数据无变化，跳过 commit。'); return; }
   git(['add', '--', SYNC_DIR]);
-  git(['commit', '-m', 'sync: update data']);
+  git(['commit', '--only', '-m', 'sync: update data', '--', SYNC_DIR]);
   console.log('已提交：sync: update data');
-  if (PUSH) { git(['push']); console.log('已推送到远端。'); }
+  if (PUSH) {
+    // Web edits may have added notes commits since this local checkout last synced.
+    // Rebase the new sync commit; conflicting remote sync changes still stop for review.
+    console.log('正在合并网页笔记等远端更新…');
+    git(['pull', '--rebase']);
+    git(['push']);
+    console.log('已推送到远端。');
+  }
   else console.log('未推送。需要上线时加 --push。');
 }
 
