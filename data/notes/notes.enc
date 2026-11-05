@@ -1,0 +1,1 @@
+{"v":1,"kdf":"PBKDF2-HMAC-SHA256","iter":600000,"alg":"AES-GCM-256","salt":"iYru+YX8S8zoH0M8VE/iEg==","iv":"mURI1lBR6bRNRbS5","aad":"reading-workbench/v1","ct":"gvQ6RK6zUYkUFfjgvVynSfPL14kKRGEZj+wQ5MfaqEdvh3nB85fczCvOhFGx9rmAin5RNaUcDthCSRQTcawGPV0V+uE/xfwSPLlZNXU8UW/Hj5IVDzAQoRjZ5AJB"}

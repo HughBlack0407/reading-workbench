@@ -1,0 +1,18 @@
+{
+  "v": 1,
+  "kdf": "PBKDF2-HMAC-SHA256",
+  "iter": 600000,
+  "alg": "AES-GCM-256",
+  "salt": "iYru+YX8S8zoH0M8VE/iEg==",
+  "aad": "reading-workbench/v1",
+  "verify": {
+    "v": 1,
+    "kdf": "PBKDF2-HMAC-SHA256",
+    "iter": 600000,
+    "alg": "AES-GCM-256",
+    "salt": "iYru+YX8S8zoH0M8VE/iEg==",
+    "iv": "HL5eHADSWF5Dy7Ep",
+    "aad": "reading-workbench/v1",
+    "ct": "Q3BwDVk2W67Zh1/2g1bBx0QGnvM="
+  }
+}

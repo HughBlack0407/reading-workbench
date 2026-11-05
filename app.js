@@ -84,8 +84,13 @@ const stringToB64 = (s) => b64encode(new TextEncoder().encode(s));
 
 /* ---------- local storage ---------- */
 function loadConfig() {
-  try { return { ...DEFAULT_CONFIG, ...JSON.parse(localStorage.getItem(LS.config) || '{}') }; }
-  catch { return { ...DEFAULT_CONFIG }; }
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(LS.config) || '{}'); }
+  catch { /* use the address of this Pages site */ }
+  const hosted = location.hostname.endsWith('.github.io')
+    ? { owner: location.hostname.slice(0, -'.github.io'.length), repo: location.pathname.split('/')[1] || '' }
+    : {};
+  return { ...DEFAULT_CONFIG, ...hosted, ...stored };
 }
 function saveConfig(c) { localStorage.setItem(LS.config, JSON.stringify(c)); }
 async function loadPat() {
@@ -150,6 +155,7 @@ async function readDataFile(path) {
   }
   if (!r.ok) throw await ghError(r);
   const j = await r.json();
+  if (j.encoding !== 'base64' || !j.content) return readSameOrigin(path);
   return { sha: j.sha, text: b64ToString(j.content), fallback: false };
 }
 async function writeDataFile(path, text, sha) {

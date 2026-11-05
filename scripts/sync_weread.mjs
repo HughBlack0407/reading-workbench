@@ -357,7 +357,6 @@ async function main() {
     schemaVersion: 1,
     syncedAt,
     files: ['shelf.enc', 'highlights.enc', 'stats.enc', 'meta.enc'],
-    counts: payload.meta.counts,
   });
 
   console.log(`已写入 ${SYNC_DIR}/ 下的 4 个密文文件与 manifest.json。`);
